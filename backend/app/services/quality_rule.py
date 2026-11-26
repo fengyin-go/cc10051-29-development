@@ -71,13 +71,43 @@ class QualityRuleService(BaseModuleService):
         })
         return report_id
 
-    def consume_cleanse_output(self, entry_id: int) -> list[str]:
-        """读取清洗模块输出的数据集作为检查输入。"""
+    def consume_cleanse_output(
+        self,
+        entry_id: int,
+        recheck_id: int | str | None = None,
+        report_id: int | str | None = None,
+    ) -> list[dict[str, Any]]:
+        """读取规则实际检查的清洗输出行。
+
+        旧实现返回同实体下清洗规则的“规则名称”，会把规则名误当成整份输入；
+        质量复查必须返回可打开、可重跑的真实数据行。优先读取质量工作流保存的
+        输入快照，也兼容清洗模块行内登记的 ``rows`` / ``输出数据``。
+        """
         entry = store.find(self.MODULE, entry_id)
         if entry is None:
             return []
-        return [r.get("规则名称", "") for r in store.rows("std_cleanse")
-                if r.get("实体编码") == entry.get("实体编码") and r.get("status") == "已启用"]
+        from app.quality_workflow import workflow
+
+        rows = workflow.input_rows_for_rule(
+            entry, recheck_id=recheck_id, report_id=report_id)
+        if rows:
+            return rows
+
+        entity_code = str(entry.get("实体编码") or entry.get("entity_code") or "")
+        for cleanse in store.rows("std_cleanse"):
+            if entity_code and cleanse.get("实体编码") != entity_code:
+                continue
+            for key in ("input_rows", "rows", "actual_input", "实际输入", "输出数据", "清洗输出"):
+                value = cleanse.get(key)
+                if isinstance(value, list) and value and isinstance(value[0], dict):
+                    return value
+        return []
+
+    def quality_context(self, entry_id: int) -> dict[str, Any] | None:
+        """规则库查看关联重检清单、原报告输入和本次实际采用输入。"""
+        from app.quality_workflow import workflow
+
+        return workflow.rule_context(entry_id)
 
     def disable_with_reason(self, entry_id: int, reason: str) -> str:
         """停用规则并登记停用原因，防止误启用。"""

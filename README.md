@@ -62,6 +62,7 @@ npm run dev
 | 血缘关系图 | `lineage_graph` | 血缘边 | 血缘边标识、上游节点、下游节点 |
 | 质量规则库 | `quality_rule` | 质量规则 | 规则名称、实体编码、检查维度 |
 | 质量报告 | `quality_result` | 质量结果 | 报告批次、实体编码、检查总数 |
+| 质量复查 | `quality_recheck` | 重检清单 | 原报告批次、报告轮次、受影响记录、输入版本、重跑结果 |
 | 合并复核队列 | `merge_review` | 复核记录 | 记录编号、候选组、复核结论 |
 | 版本回滚器 | `version_rollback` | 回滚任务 | 回滚任务、目标版本、回滚原因 |
 | 同步游标 | `sync_cursor` | 游标记录 | 源系统、实体编码、游标值 |
@@ -70,6 +71,21 @@ npm run dev
 | 实体变更审批 | `model_change` | 变更单 | 变更单号、实体编码、变更内容 |
 | 治理看板数据 | `stats_overview` | 统计快照 | 统计时间、实体编码、金记录数 |
 | 参考数据管理 | `ref_data_mgr` | 参考数据集 | 数据集编码、数据集名称、码值条目 |
+
+## 质量钻取与复查
+
+质量报告页可展开「命中来源 / 重检」：服务端按原报告身份返回命中维度、原行内容和待查记录。勾选同一记录的多项理由后，重检清单按「原报告 + 实体 + 记录」去重，因此 X 即使命中手机号、邮箱两项，也只会生成一笔重检工作。
+
+质量复查页（`/quality_recheck`）支持按实体和报告轮次筛选，核对原报告理由、迟到清洗输入凭据、规则标准与处置范围。刷新后可比较原输入和最新实际输入，并由服务端按所选输入重跑；确认后生成新的质量报告轮次，写回使用的规则标准、采用输入和重跑结果。质量规则库页顶部可查看规则关联的重检清单并打开实际使用的输入。
+
+主要接口：
+
+- `GET /api/quality_result/{报告ID或批次}/drilldown`
+- `GET /api/quality_result/{报告ID或批次}/detail`
+- `POST /api/quality_result/{报告ID或批次}/rechecks`
+- `GET /api/quality-workflow/rechecks?entity_code=CUSTOMER&report_round=R1`
+- `POST /api/quality_recheck/{重检ID}/claim|refresh|rerun|confirm`
+- `GET /api/quality_rule/{规则ID}/quality-context`
 
 ## 约定
 

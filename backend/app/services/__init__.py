@@ -14,6 +14,7 @@ from app.services.dist_task import DistTaskService
 from app.services.lineage_graph import LineageGraphService
 from app.services.quality_rule import QualityRuleService
 from app.services.quality_result import QualityResultService
+from app.services.quality_recheck import QualityRecheckService
 from app.services.merge_review import MergeReviewService
 from app.services.version_rollback import VersionRollbackService
 from app.services.sync_cursor import SyncCursorService
@@ -36,6 +37,8 @@ SERVICES: dict[str, BaseModuleService] = {
     "lineage_graph": LineageGraphService(),
     "quality_rule": QualityRuleService(),
     "quality_result": QualityResultService(),
+    "quality_recheck": QualityRecheckService(),
+    "quality_review": QualityRecheckService(),
     "merge_review": MergeReviewService(),
     "version_rollback": VersionRollbackService(),
     "sync_cursor": SyncCursorService(),
@@ -49,3 +52,9 @@ SERVICES: dict[str, BaseModuleService] = {
 
 def service_for(module: str) -> BaseModuleService | None:
     return SERVICES.get(module)
+
+
+# 导入服务时即装载质量钻取/重检示例场景，保证通用资源与自定义接口状态一致。
+from app.quality_workflow import ensure_quality_workflow  # noqa: E402
+
+ensure_quality_workflow()

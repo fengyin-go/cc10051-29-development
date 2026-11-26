@@ -18,7 +18,7 @@
       </thead>
       <tbody>
         <tr v-for="row in moduleRows" :key="row.name">
-          <td>{{ row.name }}</td>
+          <td>{{ moduleName(row.name) }}</td>
           <td>{{ row.created }}</td>
           <td>{{ row.pending }}</td>
           <td>{{ row.abnormal }}</td>
@@ -32,6 +32,7 @@
 import { computed, onMounted, ref } from 'vue'
 
 import { fetchJson } from '@/api/client'
+import { MODULE_BY_KEY } from '@/data/modules'
 
 type Overview = {
   cards: { label: string; value: number }[]
@@ -40,6 +41,10 @@ type Overview = {
 
 const cards = ref<Overview['cards']>([])
 const moduleRows = ref<Overview['modules']>([])
+
+function moduleName(key: string): string {
+  return MODULE_BY_KEY.get(key)?.name ?? key
+}
 
 onMounted(async () => {
   try {

@@ -54,13 +54,52 @@ class QualityResultService(BaseModuleService):
         return {"ok": True, "message": "已重入生成队列"}
 
     def consume_rule_hits(self, entry_id: int) -> list[dict[str, Any]]:
-        """读取质量规则库的命中记录，作为报告数据源。"""
+        """读取该报告身份下的实际命中来源，而不是把命中规则行当命中明细。"""
         entry = store.find(self.MODULE, entry_id)
         if entry is None:
             return []
+        from app.quality_workflow import workflow
+
+        drilldown = workflow.report_drilldown(entry_id)
+        if drilldown is not None:
+            return drilldown["hit_sources"]
         return [r for r in store.rows("quality_rule")
                 if r.get("实体编码") == entry.get("实体编码")
                 and int(r.get("今日命中", "0") or 0) > 0]
+
+    def drilldown(self, entry_id: int) -> dict[str, Any] | None:
+        """按原报告身份返回维度、实际命中、原行内容和待查记录。"""
+        from app.quality_workflow import workflow
+
+        return workflow.report_drilldown(entry_id)
+
+    def report_detail(self, entry_id: int) -> dict[str, Any] | None:
+        """回看原命中原因以及后续重检轮次结果。"""
+        from app.quality_workflow import workflow
+
+        return workflow.report_detail(entry_id)
+
+    def create_recheck_list(self, entry_id: int, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """服务端按原报告身份生成按记录去重的可回查重检清单。"""
+        from app.quality_workflow import workflow
+
+        data = payload or {}
+        return workflow.create_rechecks(
+            entry_id,
+            hit_ids=data.get("hit_ids") or data.get("selected") or data.get("ids"),
+            record_ids=data.get("record_ids"),
+            reviewer=str(data.get("reviewer") or data.get("复查员") or ""),
+        )
+
+    def run_action(self, entry_id: int, action: str) -> tuple[dict[str, Any] | None, str]:
+        """兼容通过统一动作入口发起重检；其余报告动作仍走通用状态流转。"""
+        text = action.strip()
+        if "重检" in text or "复查" in text or "钻取" in text:
+            result = self.create_recheck_list(entry_id)
+            if not result.get("ok"):
+                return None, str(result.get("message", "重检清单生成失败"))
+            return result, str(result.get("message", "已按原报告身份生成重检清单"))
+        return super().run_action(entry_id, text)
 
     def push_stats_overview(self, entry_id: int) -> int:
         """把评分结果推送到治理看板快照。"""
